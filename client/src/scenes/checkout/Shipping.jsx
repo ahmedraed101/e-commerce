@@ -7,7 +7,6 @@ const Shipping = ({
     touched,
     handleBlur,
     handleChange,
-    handleSubmit,
     setFieldValue,
 }) => {
     return (

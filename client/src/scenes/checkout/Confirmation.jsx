@@ -1,8 +1,14 @@
+import { Box, Alert, AlertTitle } from '@mui/material'
+
 const Confirmation = () => {
     return (
-        <div style={{ fontSize: '120px', margin: '20px', color: 'black' }}>
-            <h1>Hello</h1>
-        </div>
+        <Box m='90px auto' width='80%' height='50vh'>
+            <Alert severity='success'>
+                <AlertTitle>Success</AlertTitle>
+                You have successfully made and Order -{' '}
+                <strong>Congrats on making your purchase</strong>
+            </Alert>
+        </Box>
     )
 }
 

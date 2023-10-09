@@ -6,83 +6,12 @@ import * as yup from 'yup'
 import Shipping from './Shipping'
 import Payment from './Payment'
 import { shades } from '../../theme'
+import { loadStripe } from '@stripe/stripe-js'
+import axios from 'axios'
 
-const initialValues = {
-    billingAddress: {
-        firstName: '',
-        lastName: '',
-        country: '',
-        street1: '',
-        street2: '',
-        city: '',
-        state: '',
-        zipCode: '',
-    },
-    shippingAddress: {
-        isSameAddress: true,
-        firstName: '',
-        lastName: '',
-        country: '',
-        street1: '',
-        street2: '',
-        city: '',
-        state: '',
-        zipCode: '',
-    },
-    email: '',
-    phoneNumber: '',
-}
-
-const chekcoutSchema = [
-    yup.object().shape({
-        billingAddress: yup.object().shape({
-            firstName: yup.string().required('Required'),
-            lastName: yup.string().required('Required'),
-            country: yup.string().required('Required'),
-            street1: yup.string().required('Required'),
-            street2: yup.string(),
-            city: yup.string().required('Required'),
-            state: yup.string().required('Required'),
-            zipCode: yup.string().required('Required'),
-        }),
-        shippingAddress: yup.object().shape({
-            isSameAddress: yup.boolean(),
-            firstName: yup.string().when('isSameAddress', {
-                is: false,
-                then: () => yup.string().required('Required'),
-            }),
-            lastName: yup.string().when('isSameAddress', {
-                is: false,
-                then: () => yup.string().required('Required'),
-            }),
-            country: yup.string().when('isSameAddress', {
-                is: false,
-                then: () => yup.string().required('Required'),
-            }),
-            street1: yup.string().when('isSameAddress', {
-                is: false,
-                then: () => yup.string().required('Required'),
-            }),
-            street2: yup.string(),
-            city: yup.string().when('isSameAddress', {
-                is: false,
-                then: () => yup.string().required('Required'),
-            }),
-            state: yup.string().when('isSameAddress', {
-                is: false,
-                then: () => yup.string().required('Required'),
-            }),
-            zipCode: yup.string().when('isSameAddress', {
-                is: false,
-                then: () => yup.string().required('Required'),
-            }),
-        }),
-    }),
-    yup.object().shape({
-        email: yup.string().required('Required'),
-        phoneNumber: yup.string().required('Required'),
-    }),
-]
+const stripePromise = loadStripe(
+    'pk_test_51Nz60aLLdeEDlP7hd60x5PW6HJ8jfFGx0IiRATMG9QDd2dmXYOkRE0QPZQhr49222ZHLSWLPJPCB7Smt5TBOX6uB00G3JcHfBD'
+)
 
 const Checkout = () => {
     const [activeStep, setActiveStep] = useState(0)
@@ -90,8 +19,10 @@ const Checkout = () => {
     const isFirstStep = activeStep === 0
     const isSecondStep = activeStep === 1
 
-    const handleFormSubmit = async (values, actions) => {
-        setActiveStep(activeStep + 1)
+    const handleFormSubmit = (values, actions) => {
+        if (activeStep === 0) {
+            setActiveStep(activeStep + 1)
+        }
 
         // copies the billing address onto shipping address
         if (isFirstStep && values.shippingAddress.isSameAddress) {
@@ -102,13 +33,43 @@ const Checkout = () => {
         }
 
         if (isSecondStep) {
+            // console.log(values)
             makePayment(values)
         }
 
         actions.setTouched({})
     }
 
-    async function makePayment(values) {}
+    async function makePayment(values) {
+        const stripe = await stripePromise
+        const requestBody = {
+            userName: [
+                values.billingAddress.firstName,
+                values.billingAddress.lastName,
+            ].join(' '),
+            email: values.email,
+            products: JSON.stringify(
+                cart.map(({ id, count }) => ({ id, count }))
+            ),
+        }
+
+        console.log(requestBody)
+
+        // const { data } = await axios.post('http://localhost:1337/api/orders', {
+        //     headers: { 'Content-Type': 'application/json' },
+        //     body: JSON.stringify(requestBody),
+        // })
+        const { data } = await axios({
+            method: 'post',
+            url: 'http://localhost:1337/api/orders',
+            headers: { 'Content-Type': 'application/json' },
+            data: { body: requestBody },
+        })
+
+        await stripe.redirectToCheckout({
+            sessionId: data.id,
+        })
+    }
 
     return (
         <Box width='80%' m='100px auto'>
@@ -124,7 +85,7 @@ const Checkout = () => {
                 <Formik
                     onSubmit={handleFormSubmit}
                     initialValues={initialValues}
-                    validationSchema={chekcoutSchema[activeStep]}
+                    validationSchema={checkoutSchema[activeStep]}
                 >
                     {({
                         values,
@@ -161,7 +122,7 @@ const Checkout = () => {
                                 justifyContent='space-between'
                                 gap='50px'
                             >
-                                {isSecondStep && (
+                                {!isFirstStep && (
                                     <Button
                                         fullWidth
                                         color='primary'
@@ -174,7 +135,9 @@ const Checkout = () => {
                                             borderRadius: 0,
                                             padding: '15px 40px',
                                         }}
-                                        onClick={setActiveStep(activeStep - 1)}
+                                        onClick={() =>
+                                            setActiveStep(activeStep - 1)
+                                        }
                                     >
                                         Back
                                     </Button>
@@ -204,3 +167,80 @@ const Checkout = () => {
 }
 
 export default Checkout
+
+const initialValues = {
+    billingAddress: {
+        firstName: '',
+        lastName: '',
+        country: '',
+        street1: '',
+        street2: '',
+        city: '',
+        state: '',
+        zipCode: '',
+    },
+    shippingAddress: {
+        isSameAddress: true,
+        firstName: '',
+        lastName: '',
+        country: '',
+        street1: '',
+        street2: '',
+        city: '',
+        state: '',
+        zipCode: '',
+    },
+    email: '',
+    phoneNumber: '',
+}
+
+const checkoutSchema = [
+    yup.object().shape({
+        billingAddress: yup.object().shape({
+            firstName: yup.string().required('required'),
+            lastName: yup.string().required('required'),
+            country: yup.string().required('required'),
+            street1: yup.string().required('required'),
+            street2: yup.string(),
+            city: yup.string().required('required'),
+            state: yup.string().required('required'),
+            zipCode: yup.string().required('required'),
+        }),
+        shippingAddress: yup.object().shape({
+            isSameAddress: yup.boolean(),
+            firstName: yup.string().when('isSameAddress', {
+                is: false,
+                then: yup.string().required('required'),
+            }),
+            lastName: yup.string().when('isSameAddress', {
+                is: false,
+                then: yup.string().required('required'),
+            }),
+            country: yup.string().when('isSameAddress', {
+                is: false,
+                then: yup.string().required('required'),
+            }),
+            street1: yup.string().when('isSameAddress', {
+                is: false,
+                then: yup.string().required('required'),
+            }),
+            street2: yup.string(),
+            city: yup.string().when('isSameAddress', {
+                is: false,
+                then: yup.string().required('required'),
+            }),
+            state: yup.string().when('isSameAddress', {
+                is: false,
+                then: yup.string().required('required'),
+            }),
+            zipCode: yup.string().when('isSameAddress', {
+                is: false,
+                then: yup.string().required('required'),
+            }),
+        }),
+    }),
+    yup.object().shape({
+        email: yup.string().required('required'),
+        phoneNumber: yup.string().required('required'),
+    }),
+]
